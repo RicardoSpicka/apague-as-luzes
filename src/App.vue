@@ -1,11 +1,12 @@
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 type Difficulty = 'Fácil' | 'Médio' | 'Difícil'
 
 const selectedTheme = ref('verde')
 const themeMenuOpen = ref(false)
+const themePickerRef = ref<HTMLElement | null>(null)
 
 const themes = [
   { id: 'verde', name: 'Verde', accent: '#b8f36b' },
@@ -14,10 +15,34 @@ const themes = [
   { id: 'azul-claro', name: 'Azul Gelo', accent: '#2479b8' },
   { id: 'grafite', name: 'Grafite', accent: '#45e0d0' },
   { id: 'areia', name: 'Areia', accent: '#8a6238' },
+  { id: 'rosa', name: 'Rosa', accent: '#f08ab5' },
 ]
 
 const boardSize = ref(5)
 const difficulty = ref<Difficulty>('Fácil')
+
+const moveRanges: Record<number, Record<Difficulty, { min: number; max: number }>> = {
+  4: {
+    Fácil: { min: 3, max: 4 },
+    Médio: { min: 5, max: 6 },
+    Difícil: { min: 7, max: 8 },
+  },
+  5: {
+    Fácil: { min: 4, max: 6 },
+    Médio: { min: 7, max: 10 },
+    Difícil: { min: 11, max: 16 },
+  },
+  6: {
+    Fácil: { min: 5, max: 8 },
+    Médio: { min: 9, max: 15 },
+    Difícil: { min: 16, max: 25 },
+  },
+  7: {
+    Fácil: { min: 6, max: 10 },
+    Médio: { min: 11, max: 19 },
+    Difícil: { min: 20, max: 32 },
+  },
+}
 const lights = ref<boolean[]>([])
 const moves = ref(0)
 const elapsedSeconds = ref(0)
@@ -29,12 +54,14 @@ const hintIndex = ref<number | null>(null)
 const solution = ref<number[]>([])
 const hintRequested = ref(false)
 const hintsUsed = ref(0)
+const optimalMoveCount = ref(0)
 
 let intervalId: number | undefined
 
 const totalLightsOn = computed(
   () => lights.value.filter(Boolean).length,
 )
+const difficultyRange = computed(() => moveRanges[boardSize.value][difficulty.value])
 
 const formattedTime = computed(() => {
   const minutes = Math.floor(elapsedSeconds.value / 60)
@@ -44,6 +71,10 @@ const formattedTime = computed(() => {
 })
 
 function solveBoard(board: boolean[], size: number): number[] | null {
+  let bestSolution: number[] | null = null
+
+  // Cada combinação da primeira linha determina uma solução possível.
+  // Avaliamos todas e guardamos a solução com menos movimentos.
   for (let firstRow = 0; firstRow < (1 << size); firstRow++) {
     const state = [...board]
     const presses = Array<boolean>(size * size).fill(false)
@@ -68,29 +99,27 @@ function solveBoard(board: boolean[], size: number): number[] | null {
     }
 
     for (let col = 0; col < size; col++) {
-      if ((firstRow & (1 << col)) !== 0) {
-        press(0, col)
-      }
+      if ((firstRow & (1 << col)) !== 0) press(0, col)
     }
 
     for (let row = 1; row < size; row++) {
       for (let col = 0; col < size; col++) {
-        if (state[(row - 1) * size + col]) {
-          press(row, col)
-        }
+        if (state[(row - 1) * size + col]) press(row, col)
       }
     }
 
-    const solved = state.every((light) => !light)
-
-    if (solved) {
-      return presses
+    if (state.every((light) => !light)) {
+      const candidate = presses
         .map((pressed, index) => (pressed ? index : -1))
         .filter((index) => index !== -1)
+
+      if (bestSolution === null || candidate.length < bestSolution.length) {
+        bestSolution = candidate
+      }
     }
   }
 
-  return null
+  return bestSolution
 }
 
 function showHint() {
@@ -176,34 +205,73 @@ function applyMoveWithoutCounting(index: number) {
 function newGame() {
   stopTimer()
   hintsUsed.value = 0
+
   const total = boardSize.value * boardSize.value
+  const range = moveRanges[boardSize.value][difficulty.value]
+  let generatedBoard: boolean[] | null = null
+  let generatedSolution: number[] | null = null
+  let closestBoard: boolean[] | null = null
+  let closestSolution: number[] | null = null
+  let closestDistance = Number.POSITIVE_INFINITY
 
-  const countByDifficulty: Record<Difficulty, number> = {
-    Fácil: 5,
-    Médio: 10,
-    Difícil: 16,
+  // Tentamos tabuleiros até encontrar um cuja solução mínima esteja
+  // dentro da faixa definida para o tamanho e a dificuldade escolhidos.
+  for (let attempt = 0; attempt < 1500; attempt++) {
+    const candidateBoard = Array<boolean>(total).fill(false)
+    const positions = Array.from({ length: total }, (_, index) => index)
+
+    // Embaralha as posições para evitar movimentos repetidos no embaralhamento.
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[positions[i], positions[j]] = [positions[j], positions[i]]
+    }
+
+    const scrambleCount =
+      Math.floor(Math.random() * (range.max - range.min + 1)) + range.min
+
+    lights.value = candidateBoard
+    for (let i = 0; i < scrambleCount; i++) {
+      applyMoveWithoutCounting(positions[i])
+    }
+
+    const candidateSolution = solveBoard(lights.value, boardSize.value)
+    if (candidateSolution === null) continue
+
+    const distance = candidateSolution.length < range.min
+      ? range.min - candidateSolution.length
+      : candidateSolution.length > range.max
+        ? candidateSolution.length - range.max
+        : 0
+
+    if (distance < closestDistance) {
+      closestDistance = distance
+      closestBoard = [...lights.value]
+      closestSolution = candidateSolution
+    }
+
+    if (distance === 0) {
+      generatedBoard = [...lights.value]
+      generatedSolution = candidateSolution
+      break
+    }
   }
 
-  lights.value = Array<boolean>(total).fill(false)
-
-  const scrambleCount = countByDifficulty[difficulty.value]
-
-  for (let i = 0; i < scrambleCount; i++) {
-    const randomIndex = Math.floor(Math.random() * total)
-    applyMoveWithoutCounting(randomIndex)
+  // Salvaguarda: se a faixa não for atingida após muitas tentativas,
+  // utiliza o tabuleiro mais próximo encontrado para não bloquear o jogo.
+  if (generatedBoard === null || generatedSolution === null) {
+    generatedBoard = closestBoard ?? Array<boolean>(total).fill(false)
+    generatedSolution = closestSolution ?? []
   }
 
-  if (totalLightsOn.value === 0) {
-    applyMoveWithoutCounting(Math.floor(Math.random() * total))
-  }
+  lights.value = generatedBoard
+  optimalMoveCount.value = generatedSolution.length
+  initialLights.value = [...generatedBoard]
 
   moves.value = 0
   elapsedSeconds.value = 0
   started.value = false
   completed.value = false
   showCompletionModal.value = false
-
-  initialLights.value = [...lights.value]
   clearHint()
 }
 
@@ -224,7 +292,26 @@ function changeSettings() {
   newGame()
 }
 
-onUnmounted(stopTimer)
+function handleOutsideThemeClick(event: PointerEvent) {
+  if (!themePickerRef.value?.contains(event.target as Node)) {
+    themeMenuOpen.value = false
+  }
+}
+
+function handleThemeEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') themeMenuOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleOutsideThemeClick)
+  document.addEventListener('keydown', handleThemeEscape)
+})
+
+onUnmounted(() => {
+  stopTimer()
+  document.removeEventListener('pointerdown', handleOutsideThemeClick)
+  document.removeEventListener('keydown', handleThemeEscape)
+})
 
 newGame()
 </script>
@@ -237,7 +324,7 @@ newGame()
         <span>PUZZLE<span class="brand-accent">LAB</span></span>
       </a>
 
-    <section class="theme-picker" aria-label="Seletor de cores">
+    <section ref="themePickerRef" class="theme-picker" aria-label="Seletor de cores">
       <button
         type="button"
         class="theme-toggle"
@@ -260,7 +347,7 @@ newGame()
           :style="{ '--theme-swatch': theme.accent }"
           :aria-label="`Tema ${theme.name}`"
           :aria-pressed="selectedTheme === theme.id"
-          @click="selectedTheme = theme.id"
+          @click="selectedTheme = theme.id; themeMenuOpen = false"
         >
           <span class="theme-swatch"></span>
           <span class="theme-name">{{ theme.name }}</span>
@@ -382,6 +469,10 @@ newGame()
             <option>Médio</option>
             <option>Difícil</option>
           </select>
+          <p class="difficulty-hint">
+            Este tabuleiro pode ser resolvido em no mínimo {{ optimalMoveCount }} movimentos.
+            Faixa do nível: {{ difficultyRange.min }}–{{ difficultyRange.max }} movimentos mínimos.
+          </p>
 
           <button class="primary-button" @click="newGame">
             <span>↻</span> Novo jogo
@@ -498,6 +589,11 @@ newGame()
               <span class="completion-detail-icon">💡</span>
               <span>Dicas utilizadas</span>
               <strong>{{ hintsUsed }}</strong>
+            </div>
+            <div class="completion-detail">
+              <span class="completion-detail-icon">◎</span>
+              <span>Solução mínima</span>
+              <strong>{{ optimalMoveCount }} movimentos</strong>
             </div>
             <div class="completion-detail">
               <span class="completion-detail-icon">✓</span>

@@ -1241,6 +1241,46 @@ button:disabled {
   color: #263123;
 }
 
+:root:has(.app-shell[data-theme="rosa"]) {
+  --bg: #1d1018;
+  --panel: #2b1823;
+  --panel-border: #593044;
+  --muted: #d2a8ba;
+  --lime: #f08ab5;
+  --lime-bright: #ffc0d9;
+  background: var(--bg);
+  color: #fff0f6;
+}
+
+.app-shell[data-theme="rosa"] .brand-mark {
+  background: var(--lime);
+  color: #321525;
+}
+
+.app-shell[data-theme="rosa"] .light-tile {
+  background: #39202e;
+  border-color: #593044;
+}
+
+.app-shell[data-theme="rosa"] .light-tile.is-on {
+  background: var(--lime);
+  border-color: var(--lime-bright);
+}
+
+.app-shell[data-theme="rosa"] .tile-core {
+  background: #9e647e;
+}
+
+.app-shell[data-theme="rosa"] .light-tile.is-on .tile-core {
+  background: #fff4f8;
+}
+
+.app-shell[data-theme="rosa"] .controls-card select {
+  background: #1d1018;
+  color: #fff0f6;
+  border-color: var(--panel-border);
+}
+
 .app-shell {
   color: inherit;
 }
@@ -1653,4 +1693,19 @@ button:disabled {
 
 @media (prefers-reduced-motion: reduce) {
   .celebration-star, .celebration-orbit { animation: none !important; }
+}
+
+
+/* Informação da solução mínima do tabuleiro atual e da faixa do nível. */
+.difficulty-hint {
+  display: grid;
+  gap: 5px;
+  margin: -7px 0 14px;
+  padding: 11px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
