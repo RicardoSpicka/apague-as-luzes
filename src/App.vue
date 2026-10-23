@@ -619,21 +619,54 @@ newGame()
       </div>
     </Transition>
 
-    <footer class="footer">
-      <p>Desenvolvido por <strong>Ricardo Spicka</strong> © 2026</p>
+    <footer className="footer">
+        <div className="footer-author">
+          <p>
+            Desenvolvido por <strong>Ricardo Spicka</strong> © 2026
+          </p>
 
-      <div class="footer-links">
-        <a href="https://github.com/RicardoSpicka" target="_blank" rel="noopener noreferrer">
-          GitHub
-        </a>
-        <span>·</span>
-        <a href="https://www.linkedin.com/in/ricardo-spicka-b79049160" target="_blank" rel="noopener noreferrer">
-          LinkedIn
-        </a>
-        <span>·</span>
-        <span>Apague as Luzes</span>
-      </div>
-    </footer>
+          <div className="footer-social">
+            <a
+              href="https://github.com/RicardoSpicka"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+            <span>·</span>
+            <a
+              href="https://www.linkedin.com/in/ricardo-spicka-b79049160"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              LinkedIn
+            </a>
+          </div>
+        </div>
+
+        <div className="footer-games">
+          <span className="footer-games-title">MAIS JOGOS DO PUZZLELAB</span>
+
+          <div className="footer-games-links">
+              <a
+                href="https://maze-challenge.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Encontre a saída
+              </a>
+
+              <a
+                href="https://knight-tour-beta.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Knight’s Tour
+              </a>
+
+           </div>
+        </div>
+      </footer>
 
   </main>
 </template>
